@@ -1,0 +1,13 @@
+{
+  "name": "nullroute · a hacking game",
+  "short_name": "nullroute",
+  "description": "Break into 10 machines from a simulated terminal. Works offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070a09",
+  "theme_color": "#070a09",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
