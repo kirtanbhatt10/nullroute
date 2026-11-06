@@ -1,0 +1,150 @@
+:root {
+  --bg: #070a09;
+  --win: #0b100e;
+  --bar: #111815;
+  --line: #1d2a24;
+  --fg: #c9f5d6;
+  --dim: #5f7a6b;
+  --acc: #39ff88;
+  --err: #ff6b6b;
+  --flag: #ffd166;
+  --motd: #7fd1ff;
+  --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 700px at 50% -20%, rgba(57, 255, 136, .08), transparent 60%), var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 var(--mono);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px 10px;
+}
+
+.window {
+  width: min(1000px, 100%);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--win);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(57, 255, 136, .04), 0 30px 80px rgba(0, 0, 0, .6), 0 0 120px rgba(57, 255, 136, .06);
+  position: relative;
+  transition: box-shadow .4s;
+}
+.window::after { /* CRT scanlines */
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+body.pwned .window { box-shadow: 0 0 0 1px var(--flag), 0 30px 80px rgba(0, 0, 0, .6), 0 0 140px rgba(255, 209, 102, .35); }
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--dim);
+  user-select: none;
+}
+.lights { display: inline-flex; gap: 7px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; display: block; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.title { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pips { display: inline-flex; gap: 4px; }
+.pips b { width: 9px; height: 9px; border-radius: 2px; background: #1b2620; border: 1px solid #26362d; display: block; }
+.pips b.done { background: var(--acc); border-color: var(--acc); box-shadow: 0 0 8px rgba(57, 255, 136, .6); }
+.pips b.here { border-color: var(--acc); }
+
+.term {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+  cursor: text;
+  scrollbar-color: #24332b transparent;
+  text-shadow: 0 0 6px rgba(57, 255, 136, .18);
+}
+.out > div { white-space: pre-wrap; word-break: break-word; min-height: 1.5em; }
+.out .cmdline { color: var(--fg); }
+.out .cmdline .p { color: var(--acc); }
+.out .err { color: var(--err); text-shadow: none; }
+.out .dim { color: var(--dim); }
+.out .acc { color: var(--acc); }
+.out .motd { color: var(--motd); }
+.out .flag { color: var(--flag); text-shadow: 0 0 10px rgba(255, 209, 102, .45); font-weight: 700; }
+.out .opts { color: var(--dim); }
+
+.line { display: flex; gap: 8px; align-items: baseline; margin: 0; }
+.prompt { color: var(--acc); white-space: nowrap; flex: none; }
+.cmd {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--fg);
+  font: inherit;
+  caret-color: var(--acc);
+  padding: 0;
+  text-shadow: inherit;
+}
+
+.keys {
+  display: none;
+  gap: 6px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bar);
+  overflow-x: auto;
+}
+.keys button {
+  flex: none;
+  background: #16201b;
+  color: var(--fg);
+  border: 1px solid #26362d;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font: 13px var(--mono);
+}
+.keys button:active { background: #1f2d26; }
+
+.foot {
+  width: min(1000px, 100%);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 4px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+.foot a { color: var(--dim); }
+.foot a:hover { color: var(--acc); }
+
+@media (max-width: 700px), (pointer: coarse) {
+  body { padding: 0; }
+  .window { border-radius: 0; border-left: 0; border-right: 0; }
+  .keys { display: flex; }
+  .foot { display: none; }
+  body { font-size: 13px; }
+  .lights { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window { transition: none; }
+}
