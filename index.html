@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>nullroute · a hacking game in your browser</title>
+  <meta name="description" content="Break into 10 machines from a simulated Linux terminal. Hidden files, git leaks, JWT forgery, SQL injection, password cracking and XOR crypto. Free, offline, no sign-up.">
+  <meta name="theme-color" content="#070a09">
+  <meta property="og:title" content="nullroute · a hacking game in your browser">
+  <meta property="og:description" content="Ten machines. Ten flags. Learn real attacks in a fake terminal.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="window" role="application" aria-label="nullroute terminal game">
+    <header class="bar">
+      <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="title" id="title">nullroute</span>
+      <span class="pips" id="pips" aria-label="progress"></span>
+    </header>
+    <div class="term" id="term">
+      <div id="out" class="out" aria-live="polite"></div>
+      <form class="line" id="form" autocomplete="off">
+        <label for="cmd" class="prompt" id="prompt">guest@gate:~$</label>
+        <input id="cmd" class="cmd" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" enterkeyhint="send" aria-label="command">
+      </form>
+    </div>
+    <nav class="keys" aria-label="quick commands">
+      <button type="button" data-cmd="help">help</button>
+      <button type="button" data-cmd="hint">hint</button>
+      <button type="button" data-cmd="levels">levels</button>
+      <button type="button" data-cmd="ls -a">ls -a</button>
+      <button type="button" data-key="tab">tab ⇥</button>
+      <button type="button" data-key="up">↑</button>
+      <button type="button" data-key="pipe">|</button>
+    </nav>
+  </div>
+  <footer class="foot">
+    <span>nullroute <span id="ver"></span> · runs 100% in your browser, nothing is sent anywhere</span>
+    <a href="https://github.com/kirtanbhatt10/nullroute" target="_blank" rel="noopener noreferrer">source on GitHub</a>
+  </footer>
+  <script src="shell.js"></script>
+  <script src="levels.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
