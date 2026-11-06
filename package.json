@@ -1,0 +1,31 @@
+{
+  "name": "nullroute",
+  "version": "1.0.0",
+  "description": "A hacking game that runs entirely in your browser: break into 10 machines in a simulated Linux terminal and learn real attacks along the way.",
+  "main": "shell.js",
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": [
+    "ctf",
+    "hacking-game",
+    "cybersecurity",
+    "terminal",
+    "wargame",
+    "jwt",
+    "sql-injection",
+    "education",
+    "browser-game"
+  ],
+  "author": "Kirtan Bhatt",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kirtanbhatt10/nullroute.git"
+  },
+  "homepage": "https://kirtanbhatt10.github.io/nullroute/",
+  "engines": {
+    "node": ">=18"
+  }
+}
