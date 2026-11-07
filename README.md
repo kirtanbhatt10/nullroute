@@ -6,7 +6,7 @@
 
 ### A hacking game that runs entirely in your browser.
 
-Ten machines. Ten flags. One fake Linux terminal.<br>
+Twelve machines. Twelve flags. One fake Linux terminal.<br>
 Break in by doing what real attackers do, and learn **why** each attack works.
 
 [![Play now](https://img.shields.io/badge/%E2%96%B6_play_now-kirtanbhatt10.github.io%2Fnullroute-39ff88?style=for-the-badge&labelColor=070a09)](https://kirtanbhatt10.github.io/nullroute/)
@@ -42,7 +42,9 @@ No installs, no VMs, no Docker, no account. Open the page and type `ls`.
 | 7 | `tokens` | JWT forgery with `alg: none` | `cut`, `base64url`, `curl -H` |
 | 8 | `shop` | SQL injection (login bypass) | `curl` with crafted input |
 | 9 | `vault` | Cracking unsalted password hashes | `find`, `crack`, `su` |
-| 10 | `blackbox` | Breaking single-byte XOR with known plaintext | `xor -b`, `xor -k` |
+| 10 | `billing` | IDOR: changing an ID to read another account | `curl` |
+| 11 | `archive` | Path traversal with `../` | `curl` |
+| 12 | `blackbox` | Breaking single-byte XOR with known plaintext | `xor -b`, `xor -k` |
 
 Every flag comes with a short **lesson** explaining the real-world mistake and the fix. Stuck? `hint` gives progressively stronger nudges, three or four per target.
 
@@ -76,13 +78,13 @@ There is no build step. It is plain HTML, CSS and JavaScript with zero dependenc
 npm test
 ```
 
-The suite includes a **full scripted playthrough** that solves all ten targets the intended way, so a broken level fails CI. It also checks the SHA-256 implementation against `node:crypto`, base64/base64url against `Buffer`, the tokenizer, tampered-JWT rejection, SQL syntax errors, permissions, tab completion and progress persistence. CI runs on Node 18, 20 and 22.
+The suite includes a **full scripted playthrough** that solves all twelve targets the intended way, so a broken level fails CI. It also checks the SHA-256 implementation against `node:crypto`, base64/base64url against `Buffer`, the tokenizer, tampered-JWT rejection, SQL syntax errors, permissions, tab completion and progress persistence. CI runs on Node 18, 20 and 22.
 
 ## How it is built
 
 ```
 shell.js    the engine: tokenizer, virtual filesystem, ~35 commands, HTTP/git/auth simulation
-levels.js   the ten targets: files, services, flags, hints and lessons
+levels.js   the twelve targets: files, services, flags, hints and lessons
 app.js      the terminal UI: rendering, history, completion, boot sequence
 style.css   CRT-flavoured styling
 sw.js       offline cache
@@ -96,7 +98,7 @@ The flags are in `levels.js`. Reading the source is a perfectly legitimate hacki
 
 ## Contributing
 
-Ideas for new targets are very welcome: SSRF, path traversal, IDOR, cookie tampering, weak RNG, open redirects. Open an issue describing the vulnerability and the "aha" moment, or send a PR with the level and its test.
+Ideas for new targets are very welcome: SSRF, cookie tampering, weak RNG, open redirects. Open an issue describing the vulnerability and the "aha" moment, or send a PR with the level and its test.
 
 ## License
 
