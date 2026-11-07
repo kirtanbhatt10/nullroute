@@ -1,7 +1,7 @@
 {
   "name": "nullroute",
   "version": "1.0.0",
-  "description": "A hacking game that runs entirely in your browser: break into 10 machines in a simulated Linux terminal and learn real attacks along the way.",
+  "description": "A hacking game that runs entirely in your browser: break into 12 machines in a simulated Linux terminal and learn real attacks along the way.",
   "main": "shell.js",
   "scripts": {
     "test": "node --test",
