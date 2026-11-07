@@ -1,5 +1,5 @@
 /*!
- * nullroute levels: ten targets at the fictional Halcyon Dynamics.
+ * nullroute levels: twelve targets at the fictional Halcyon Dynamics.
  * Yes, the flags are in this file. Reading the source is a legitimate hacking technique.
  * The fun is in breaking in the intended way. MIT License (c) 2026 Kirtan Bhatt
  */
@@ -132,7 +132,9 @@
     'NR{4lg_n0n3_m34ns_n0_s3cur1ty}',
     'NR{s4n1t1z3_y0ur_1nputs}',
     'NR{w34k_p4ssw0rds_f4ll_f4st}',
-    'NR{x0r_1s_0nly_4s_str0ng_4s_1ts_k3y}'
+    'NR{x0r_1s_0nly_4s_str0ng_4s_1ts_k3y}',
+    'NR{1d0r_ch3ck_wh0_0wns_1t}',
+    'NR{d0t_d0t_sl4sh_3sc4p3s_r00t}'
   ];
 
   var hex = util.hexEncode(util.fromBytes(util.toBytes(TRANSMISSION + F[9] + ' :: end').map(function (b) { return b ^ 0x5a; })))
@@ -287,6 +289,67 @@
         '/root/': { owner: 'admin' },
         '/root/flag.txt': { content: F[8] + '\n', owner: 'admin' },
         '/root/.motd': { content: 'You should not be here. Unless you are admin.\n', owner: 'admin' }
+      }
+    },
+    {
+      id: 'billing', host: 'billing', user: 'guest', home: '/home/guest',
+      title: 'Off by one account',
+      brief: 'The billing portal at http://billing.halcyon.local/ shows you your own invoice. The URL has a number in it.\nYours is #1007. The server never checks whose invoice you asked for.',
+      flag: F[10],
+      lesson: 'Never let a client-supplied ID stand in for proof of ownership. Check that the logged-in user actually owns the object (authorization) on every request. This bug class is IDOR.',
+      hints: ['curl http://billing.halcyon.local/ and read your account id.', 'Fetch your own first: curl "http://billing.halcyon.local/invoice?id=1007". Then change the number.', 'Finance is account #1000. Try id=1000.'],
+      files: {
+        '/home/guest/README.txt': 'Billing portal: http://billing.halcyon.local/\nYou are logged in as account #1007 (contractor).\nInvoices: /invoice?id=<number>\n'
+      },
+      http: {
+        'billing.halcyon.local': function (req) {
+          var p = req.path.replace(/\/+$/, '') || '/';
+          if (p === '/') return { status: 200, headers: { 'Content-Type': 'text/html' }, body: '<!doctype html>\n<title>Halcyon Billing</title>\n<h1>Your invoices</h1>\n<ul><li><a href="/invoice?id=1007">Invoice #1007</a></li></ul>\n<!-- accounts run 1000-1007; 1000 is finance -->\n' };
+          if (p === '/invoice') {
+            var id = parseInt(req.query.id, 10);
+            if (!id) return { status: 400, body: 'usage: /invoice?id=<number>' };
+            if (id === 1000) return { status: 200, body: 'Invoice #1000   account: finance (CFO)\nItem: Q4 security retainer\nAmount: 42000 INR\nInternal memo code: ' + F[10] + '\n' };
+            var who = { 1001: 'Ravi Mehta', 1002: 'payroll', 1007: 'you (contractor)' }[id] || 'account ' + id;
+            return { status: 200, body: 'Invoice #' + id + '   account: ' + who + '\nItem: monthly services\nAmount: 1800 INR\n' };
+          }
+          return { status: 404, body: 'Not Found' };
+        }
+      }
+    },
+    {
+      id: 'archive', host: 'archive', user: 'guest', home: '/home/guest',
+      title: 'Dot dot slash',
+      brief: 'A document server at http://archive.halcyon.local/ serves files from its public folder.\nIt builds the path by gluing your filename onto the end, and never looks where that path ends up.',
+      flag: F[11],
+      lesson: 'Concatenating user input into a file path lets ../ climb out of the intended directory (path traversal). Canonicalise the resolved path and confirm it still sits inside the allowed root before opening it.',
+      hints: ['curl http://archive.halcyon.local/ then fetch a listed doc: curl "http://archive.halcyon.local/get?file=welcome.txt"', 'The server opens /srv/public/ + whatever you pass. ../ walks up one directory.', 'There is a secrets file one level above public. Try file=../secret.txt'],
+      files: {
+        '/home/guest/README.txt': 'Document server: http://archive.halcyon.local/\nFetch docs with /get?file=<name>.\n'
+      },
+      http: {
+        'archive.halcyon.local': function (req) {
+          var p = req.path.replace(/\/+$/, '') || '/';
+          if (p === '/') return { status: 200, headers: { 'Content-Type': 'text/html' }, body: '<!doctype html>\n<title>Halcyon Docs</title>\n<h1>Public documents</h1>\n<ul><li>welcome.txt</li><li>handbook.txt</li></ul>\n<p>Fetch: /get?file=welcome.txt</p>\n' };
+          if (p === '/get') {
+            var name = req.query.file;
+            if (name == null) return { status: 400, body: 'usage: /get?file=<name>' };
+            var base = ['srv', 'public']; // server root; path is resolved the naive way
+            name.split('/').forEach(function (seg) {
+              if (seg === '' || seg === '.') return;
+              if (seg === '..') base.pop(); else base.push(seg);
+            });
+            var abs = '/' + base.join('/');
+            var tree = {
+              '/srv/public/welcome.txt': 'Welcome to the Halcyon document archive.\n',
+              '/srv/public/handbook.txt': 'Staff handbook: be excellent to each other.\n',
+              '/srv/secret.txt': 'Restricted — keep above the public root.\nrecovery_code=' + F[11] + '\n',
+              '/etc/passwd': 'root:x:0:0:root:/root:/bin/bash\nravi:x:1001:1001:Ravi Mehta:/home/ravi:/bin/bash\n'
+            };
+            if (tree[abs] != null) return { status: 200, body: tree[abs] };
+            return { status: 404, body: 'No such file: ' + abs };
+          }
+          return { status: 404, body: 'Not Found' };
+        }
       }
     },
     {
