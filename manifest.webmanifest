@@ -1,7 +1,7 @@
 {
   "name": "nullroute · a hacking game",
   "short_name": "nullroute",
-  "description": "Break into 10 machines from a simulated terminal. Works offline.",
+  "description": "Break into 12 machines from a simulated terminal. Works offline.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
