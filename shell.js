@@ -792,7 +792,7 @@
       return [{ text: BANNER, cls: 'acc' },
         { text: '', cls: null },
         { text: 'nullroute v' + VERSION + ' · a hacking game that runs entirely in your browser', cls: 'dim' },
-        { text: 'You are a contractor hired to red-team Halcyon Dynamics. Ten machines. Ten flags.', cls: null },
+        { text: 'You are a contractor hired to red-team Halcyon Dynamics. Twelve machines. Twelve flags.', cls: null },
         { text: 'Type help to see commands, hint if you are stuck, levels for the mission map.', cls: null },
         { text: done ? 'Progress restored: ' + done + '/' + LEVELS.length + ' targets rooted.' : 'Start by looking around: ls', cls: 'dim' }]
         .concat(motd().split('\n').filter(function (x, i, a) { return i < a.length - 1; }).map(function (t) { return { text: t, cls: 'motd' }; }));
