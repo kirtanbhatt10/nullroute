@@ -124,6 +124,14 @@ test('full playthrough: every level is solvable the intended way', () => {
   run(g, 'exit');
   assert.equal(g._state().user, 'guest');
 
+  run(g, 'ssh billing');
+  assert.match(run(g, 'curl "http://billing.halcyon.local/invoice?id=1007"'), /contractor/);
+  solveAndSubmit(g, flagIn(run(g, 'curl "http://billing.halcyon.local/invoice?id=1000"')));
+
+  run(g, 'ssh archive');
+  assert.match(run(g, 'curl "http://archive.halcyon.local/get?file=welcome.txt"'), /document archive/);
+  solveAndSubmit(g, flagIn(run(g, 'curl "http://archive.halcyon.local/get?file=../secret.txt"')));
+
   run(g, 'ssh blackbox');
   assert.equal(flagIn(run(g, 'cat transmission.hex')), undefined);
   const brute = run(g, 'xor -b transmission.hex');
@@ -131,8 +139,8 @@ test('full playthrough: every level is solvable the intended way', () => {
   const first = parseInt(run(g, 'head -n 1 transmission.hex').split(' ')[0], 16);
   const key = (first ^ 'T'.charCodeAt(0)).toString(16);
   const out = run(g, 'submit ' + flagIn(run(g, 'xor -k ' + key + ' transmission.hex')));
-  assert.match(out, /ALL 10 TARGETS ROOTED/);
-  assert.equal(g.progress().solved, 10);
+  assert.match(out, /ALL 12 TARGETS ROOTED/);
+  assert.equal(g.progress().solved, 12);
 });
 
 test('wrong flags are rejected, cross-level flags are explained', () => {
@@ -205,5 +213,5 @@ test('prompt reflects user, host and path', () => {
 test('welcome screen renders', () => {
   const lines = newGame().welcome();
   assert.ok(lines.length > 5);
-  assert.ok(lines.some((l) => /Ten machines/.test(l.text)));
+  assert.ok(lines.some((l) => /Twelve machines/.test(l.text)));
 });
