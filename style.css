@@ -9,6 +9,7 @@
   --err: #ff6b6b;
   --flag: #ffd166;
   --motd: #7fd1ff;
+  --mentor: #c9a7ff;
   --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
@@ -88,6 +89,7 @@ body.pwned .window { box-shadow: 0 0 0 1px var(--flag), 0 30px 80px rgba(0, 0, 0
 .out .motd { color: var(--motd); }
 .out .flag { color: var(--flag); text-shadow: 0 0 10px rgba(255, 209, 102, .45); font-weight: 700; }
 .out .opts { color: var(--dim); }
+.out .mentor { color: var(--mentor); text-shadow: 0 0 6px rgba(201, 167, 255, .22); }
 
 .line { display: flex; gap: 8px; align-items: baseline; margin: 0; }
 .prompt { color: var(--acc); white-space: nowrap; flex: none; }
