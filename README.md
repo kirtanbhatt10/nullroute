@@ -46,7 +46,21 @@ No installs, no VMs, no Docker, no account. Open the page and type `ls`.
 | 11 | `archive` | Path traversal with `../` | `curl` |
 | 12 | `blackbox` | Breaking single-byte XOR with known plaintext | `xor -b`, `xor -k` |
 
-Every flag comes with a short **lesson** explaining the real-world mistake and the fix. Stuck? `hint` gives progressively stronger nudges, three or four per target.
+Every flag comes with a short **lesson** explaining the real-world mistake and the fix. Stuck? `mentor` explains what to try next, and `hint` gives progressively stronger nudges, three or four per target.
+
+## Mentor mode
+
+New to the command line, or just stuck? Type `mentor`. It is a guide that lives inside the terminal and teaches you *how* to break in, without handing you the flag.
+
+| Command | What it does |
+| --- | --- |
+| `mentor` | Where you are, what this target teaches, the tools worth trying, and your next move |
+| `mentor next` | Just the next move, based on what you have already tried on this target |
+| `mentor basics` | How to play: exploring, searching, pipes, submitting flags, moving between targets |
+| `mentor <command>` | Learn a command with examples, e.g. `mentor grep`, `mentor curl`, `mentor pipes`, `mentor quotes` |
+| `mentor on` / `off` | Live coaching while you play: catches typos (`lss` → did you mean `ls`?), explains errors, tells you when you have printed a flag but not submitted it, briefs you on each new target, and nudges you if you seem stuck |
+
+The mentor reads what you have done so far, so its advice moves forward as you do. It never prints a flag. `hint` is still there when you want a more direct push. Your mentor on/off choice is saved, and survives `reset`.
 
 ## The terminal
 
@@ -90,7 +104,7 @@ style.css   CRT-flavoured styling
 sw.js       offline cache
 ```
 
-Adding a level means adding one object to `levels.js`: a filesystem map, optional `http` handlers or `git` history, a flag, hints and a lesson. Then add its solution to `test/game.test.js`.
+Adding a level means adding one object to `levels.js`: a filesystem map, optional `http` handlers or `git` history, a flag, hints, a lesson and `mentor` guidance (concept, tools and steps). Then add its solution to `test/game.test.js`.
 
 ## Cheating
 
