@@ -147,6 +147,18 @@
       brief: 'Your first foothold: a forgotten jump box. Someone left something behind in the home folder.\nTry: ls',
       flag: F[0],
       lesson: 'Files starting with a dot are hidden by default. ls -a shows them. Attackers always look.',
+      mentor: {
+        concept: 'On Linux, any file whose name starts with a dot is hidden from a plain ls. People stash config, shell history and secrets there, so attackers always look.',
+        tools: ['ls -a', 'cat'],
+        steps: [
+          { seen: /^ls\b/, say: 'Look around first. ls lists the files in the folder you are in.' },
+          { seen: /^ls\b.*\s-\w*a/, say: 'Only a couple of files showed up, and notes.txt mentions dotfiles. ls hides some names by default: help ls shows the option that reveals them.' },
+          { seen: /^cat\b.*\.flag/, say: 'Now you can see the hidden files. Read the one that sounds like a prize with cat <name>, then submit what it holds.' }
+        ],
+        watch: [
+          { cmd: /^cat\b.*\.bash_history/, say: 'Good instinct: shell history shows what the last user did. Which file did they edit and then lock down?' }
+        ]
+      },
       hints: ['ls only shows "normal" files. Run help ls.', 'Dotfiles (names starting with .) are hidden. Try ls -a', 'cat .flag then submit what you find.'],
       files: {
         '/home/guest/README.txt': 'Welcome to Halcyon Dynamics jump box "gate".\n\nThis machine is scheduled for decommissioning.\nPersonal files have been "removed".\n\n  - IT Ops\n',
@@ -163,6 +175,19 @@
       brief: 'The log server. A backup agent printed its session token into the auth log, somewhere in 2,400 lines.',
       flag: F[1],
       lesson: 'grep turns thousands of lines into one. Secrets in logs are one of the most common real leaks.',
+      mentor: {
+        concept: 'Logs record everything, sometimes including secrets. Nobody reads 2,400 lines by eye: grep filters a file down to the lines that match a pattern.',
+        tools: ['ls /var/log', 'wc -l', 'grep'],
+        steps: [
+          { seen: /\/var\/log|^cd\s+\/var/, say: 'README.txt says logs live "where logs always live". On Linux that is /var/log. List it.' },
+          { seen: /^(grep|wc)\b/, say: 'auth.log is big. Check how big with wc -l /var/log/auth.log, then let grep do the reading: grep <pattern> <file>.' },
+          { seen: /^grep\b.*NR/, say: 'What text appears at the start of every flag in this game? Search for exactly that.' }
+        ],
+        watch: [
+          { cmd: /^cat\b[^|]*auth\.log\s*$/, say: 'That is a lot of scrolling. grep can do the reading for you: help grep' },
+          { out: /flag\{nope/, say: 'flag{...} is a decoy. Real flags here always use the NR{...} format.' }
+        ]
+      },
       hints: ['The interesting file is in /var/log.', 'Reading 2,400 lines by hand is not the way. grep searches files: help grep', 'Flags all start with NR{ ... try: grep NR /var/log/auth.log'],
       files: {
         '/home/guest/README.txt': 'needle: central syslog collector.\nLogs live where logs always live.\n',
@@ -177,6 +202,15 @@
       brief: 'You intercepted a courier message. It looks scrambled, but it was only encoded. Maybe more than once.',
       flag: F[2],
       lesson: 'Base64 is a transport format, not protection. Anyone can reverse it, as many times as it was applied.',
+      mentor: {
+        concept: 'Base64 turns bytes into plain letters so they survive email and URLs. It hides nothing: anyone can decode it, and something encoded twice just needs decoding twice.',
+        tools: ['file', 'base64 -d', '| (pipes)'],
+        steps: [
+          { seen: /intercept|^file\b/, say: 'Start with the evidence: cat intercept.txt, or ask the system what it is with file intercept.txt.' },
+          { seen: /base64\b.*-d/, say: 'Letters, digits, + / and a trailing = are the base64 alphabet. Decode it: base64 -d intercept.txt' },
+          { seen: /base64\s+-d.*\|\s*base64\s+-d/, say: 'The result still looks like base64, and README.txt says it was "encrypted twice". Pipe the decoded text into a second decode: mentor pipes' }
+        ]
+      },
       hints: ['Look at intercept.txt. The alphabet (A-Z, a-z, 0-9, +, /, =) is a giveaway. Try: file intercept.txt', 'Decode it with base64 -d intercept.txt', 'Still gibberish? Pipe it again: cat intercept.txt | base64 -d | base64 -d'],
       files: {
         '/home/guest/intercept.txt': util.b64encode(util.b64encode('Meet at dock 7 after midnight. Passphrase: ' + F[2] + '\n')).match(/.{1,64}/g).join('\n') + '\n',
@@ -189,6 +223,17 @@
       brief: 'A firmware image pulled off a Halcyon door controller. Binaries hide readable text, and the debug key looks... rotated.',
       flag: F[3],
       lesson: 'strings pulls readable text out of binaries; ROT13 is a toy cipher anyone can undo. Never ship debug keys in firmware.',
+      mentor: {
+        concept: 'A compiled binary is mostly unreadable bytes, but every piece of text the program uses (messages, paths, keys) sits inside it in plain form. ROT13 shifts letters by 13 and undoes itself.',
+        tools: ['strings', 'grep', 'rot13'],
+        steps: [
+          { seen: /^(strings|xxd)\b/, say: 'cat on a binary prints noise. strings door-ctl.bin shows only the readable parts.' },
+          { seen: /rot13/, say: 'One string looks like key=value with scrambled letters, but its digits and braces survived. Which letter shift leaves digits and symbols alone? Pipe the output through it.' }
+        ],
+        watch: [
+          { cmd: /^cat\b[^|]*\.bin\s*$/, say: 'That garbage is raw machine code. For binaries, strings beats cat.' }
+        ]
+      },
       hints: ['cat on a binary is noise. Try strings door-ctl.bin', 'One string looks like a key=value pair with scrambled letters, but the digits and braces survived.', 'Letters shifted by 13: strings door-ctl.bin | rot13'],
       files: {
         '/home/guest/door-ctl.bin': firmware('debug_key=' + F[3]),
@@ -201,6 +246,18 @@
       brief: 'A developer workstation. The team "removed" an API key from their web app repository last week.',
       flag: F[4],
       lesson: 'Deleting a secret in a new commit leaves it in history forever. Rotate leaked keys; do not just delete them.',
+      mentor: {
+        concept: 'Git stores every version of every file. Deleting a secret in a new commit removes it from today\'s files, but the older commit still contains it.',
+        tools: ['cd webapp', 'git log', 'git show <hash>'],
+        steps: [
+          { seen: /^cd\b.*webapp|webapp/, say: 'There is a project folder in your home. cd into it and look around with ls -a.' },
+          { seen: /^git\s+log/, say: 'The .git folder means this is a repository. git log lists its history.' },
+          { seen: /^git\s+show/, say: 'One commit message sounds like someone cleaning up a mistake. The commit before it is probably the mistake. git show <hash> prints exactly what a commit changed.' }
+        ],
+        watch: [
+          { cmd: /^cat\b.*todo/, say: 'Ravi is asking whether deleting a key in a commit is enough. Keep that question in mind.' }
+        ]
+      },
       hints: ['cd webapp and look around. It is a git repository.', 'git log shows the history. One commit message sounds guilty.', 'git show <hash> prints that commit\'s diff, including removed lines.'],
       files: {
         '/home/dev/webapp/app.py': 'import os\nfrom flask import Flask\n\napp = Flask(__name__)\nAPI_KEY = os.environ["API_KEY"]  # moved to env, much safer now\n\n@app.get("/")\ndef index():\n    return "halcyon internal"\n',
@@ -228,6 +285,16 @@
       brief: 'From here you can reach the internal web server at http://intranet.halcyon.local/\nRecon first: what are search engines told not to look at?',
       flag: F[5],
       lesson: 'robots.txt is a public list of places a site would rather you did not look. It is a map, not a lock.',
+      mentor: {
+        concept: 'Recon comes before attack. Sites publish /robots.txt to tell search engines which paths to skip, which tells you exactly where the interesting stuff is.',
+        tools: ['curl', '/robots.txt'],
+        steps: [
+          { seen: /^curl\b.*intranet/, say: 'Fetch the homepage: curl http://intranet.halcyon.local/ and read the HTML, comments included.' },
+          { seen: /robots\.txt/, say: 'Well-behaved crawlers read a rules file at the root of every site before they crawl. Request it.' },
+          { seen: /backup-/, say: 'Visit each disallowed path. A 403 means locked, but not every path is locked.' },
+          { seen: /\.bak/, say: 'A directory listing shows files you can fetch directly. Add the file name to the end of the URL.' }
+        ]
+      },
       hints: ['curl http://intranet.halcyon.local/', 'Well-behaved crawlers read /robots.txt before crawling.', 'Visit the disallowed path, then the file inside it.'],
       files: {
         '/home/guest/README.txt': 'Reachable from this box:\n  http://intranet.halcyon.local/\nUse curl.\n'
@@ -250,6 +317,21 @@
       brief: 'The API at http://api.halcyon.local/ has an /admin endpoint. You have a guest session token.\nIt is signed... or is it?',
       flag: F[6],
       lesson: 'A JWT is just base64url JSON. Servers must pin the expected algorithm and never accept "alg":"none".',
+      mentor: {
+        concept: 'A JSON Web Token is three base64url parts: header.payload.signature. The header names the algorithm that checks the signature. A broken server believes a token that says it needs none.',
+        tools: ['curl -H', 'cut -d. -f1', 'base64url -d', 'echo -n ... | base64url'],
+        steps: [
+          { seen: /^curl\b.*api\.halcyon/, say: 'Read the API docs: curl http://api.halcyon.local/' },
+          { seen: /^curl\b.*-H/, say: 'The endpoints want your token in a header. curl -H "Authorization: Bearer <token>" adds it. Try /whoami, then /admin.' },
+          { seen: /base64url\s+-d/, say: 'Your token is not encrypted, just encoded. Split it on the dots (cut -d. -f1 session.txt, then -f2) and decode each part with base64url -d.' },
+          { seen: /\|\s*base64url\s*$/, say: 'You cannot re-sign it without the secret key. But what if the header claimed no signature is needed? Write your own header and payload as JSON and encode them: mentor quotes' },
+          { seen: /Bearer\s+\S+\.\S+\.(\s|"|$)/, say: 'Join your header and payload as HEADER.PAYLOAD. with a trailing dot and an empty signature, then call /admin.' }
+        ],
+        watch: [
+          { out: /admins only/, say: 'The server reads your role from inside the token. Decode the token and see what it says about you.' },
+          { out: /invalid signature/, say: 'Editing an HS256 token breaks its signature. Instead of fighting the signature, look at the alg field in the header.' }
+        ]
+      },
       hints: ['curl http://api.halcyon.local/ and read session.txt. Send it with: curl -H "Authorization: Bearer <token>" http://api.halcyon.local/whoami',
         'A JWT is header.payload.signature, each base64url. Decode them: cut -d. -f1 session.txt | base64url -d   (and -f2)',
         'You cannot sign as admin without the secret, but you can claim no signature is needed. Build a header with alg "none": echo -n \'{"alg":"none","typ":"JWT"}\' | base64url',
@@ -266,6 +348,19 @@
       brief: 'The staff shop at http://shop.halcyon.local/ has an admin account. You do not know its password.\nYou do not need to.',
       flag: F[7],
       lesson: 'Building SQL by gluing strings lets input become code. Parameterised queries make this whole class of bug impossible.',
+      mentor: {
+        concept: 'SQL injection happens when user input is pasted straight into a database query. A quote character ends the text early, and whatever comes after it runs as SQL.',
+        tools: ['curl', '"double-quoted URLs"', "' (quote)", '-- (SQL comment)'],
+        steps: [
+          { seen: /^curl\b.*shop\.halcyon/, say: 'Read the shop page source with curl, comments and all. Developers leave things behind.' },
+          { seen: /debug=1/, say: 'There is a debug switch. Add &debug=1 to a login attempt to see the exact SQL the server builds from your input.' },
+          { seen: /user=[^&"]*'/, say: 'Your username lands inside quotes in that SQL. What happens if your username contains a quote too? Wrap the whole URL in double quotes so the shell passes \' through.' },
+          { seen: /--/, say: 'Once you can close the quote, SQL\'s -- turns the rest of the line into a comment, including the password check.' }
+        ],
+        watch: [
+          { out: /SQL error/, say: 'An SQL error means your input changed the shape of the query. That is the vulnerability talking.' }
+        ]
+      },
       hints: ['Read the page source: curl http://shop.halcyon.local/. A developer left a debug switch.', 'Try a login with &debug=1 to see the exact SQL. Wrap URLs in double quotes so the shell leaves \' alone.',
         'Your input lands inside username=\'...\'. Close the quote and comment out the rest: user=admin\'--',
         'curl "http://shop.halcyon.local/login?user=admin\'--&pass=x"'],
@@ -280,6 +375,16 @@
       brief: 'The vault server. The flag is in /root, readable only by admin. Somebody left a backup of the password file lying around.',
       flag: F[8],
       lesson: 'Fast unsalted hashes of human passwords fall to a wordlist in seconds. Use bcrypt/argon2 and long passphrases.',
+      mentor: {
+        concept: 'Password files store hashes, not passwords. A fast, unsalted hash like plain SHA-256 can be reversed by hashing every word in a wordlist and comparing the results.',
+        tools: ['find / -name', 'grep', 'crack -w', 'su'],
+        steps: [
+          { seen: /^find\b/, say: 'The brief mentions a backup lying around. Search the whole filesystem for backup files: find / -name "*.bak"' },
+          { seen: /shadow/, say: 'Read the backup. Each line is user:hash:...; the admin hash comes right after $sha256$.' },
+          { seen: /^crack\b/, say: 'There is a wordlist under /usr/share/wordlists. Point crack at it along with the admin hash.' },
+          { seen: /^su\s+admin/, say: 'You have a password. su admin <password> makes you admin; then look in /root.' }
+        ]
+      },
       hints: ['find / -name "*.bak"', 'The admin line contains a SHA-256 hash after $sha256$. There is a wordlist in /usr/share/wordlists.', 'crack -w /usr/share/wordlists/common.txt <hash>   then   su admin <password>   then look in /root'],
       users: { admin: VAULT_PASSWORD },
       files: {
@@ -297,6 +402,15 @@
       brief: 'The billing portal at http://billing.halcyon.local/ shows you your own invoice. The URL has a number in it.\nYours is #1007. The server never checks whose invoice you asked for.',
       flag: F[10],
       lesson: 'Never let a client-supplied ID stand in for proof of ownership. Check that the logged-in user actually owns the object (authorization) on every request. This bug class is IDOR.',
+      mentor: {
+        concept: 'IDOR (insecure direct object reference): the app picks a record by the number in the URL and never checks that the record belongs to you.',
+        tools: ['curl', '?id= in the URL'],
+        steps: [
+          { seen: /^curl\b.*billing/, say: 'Open the portal with curl and read the page, HTML comments included.' },
+          { seen: /id=1007/, say: 'Fetch your own invoice first (/invoice?id=1007) so you know what normal looks like.' },
+          { seen: /id=(?!1007)\d+/, say: 'Now ask the attacker\'s question: what if you request someone else\'s number? The page source says which range accounts use.' }
+        ]
+      },
       hints: ['curl http://billing.halcyon.local/ and read your account id.', 'Fetch your own first: curl "http://billing.halcyon.local/invoice?id=1007". Then change the number.', 'Finance is account #1000. Try id=1000.'],
       files: {
         '/home/guest/README.txt': 'Billing portal: http://billing.halcyon.local/\nYou are logged in as account #1007 (contractor).\nInvoices: /invoice?id=<number>\n'
@@ -322,6 +436,18 @@
       brief: 'A document server at http://archive.halcyon.local/ serves files from its public folder.\nIt builds the path by gluing your filename onto the end, and never looks where that path ends up.',
       flag: F[11],
       lesson: 'Concatenating user input into a file path lets ../ climb out of the intended directory (path traversal). Canonicalise the resolved path and confirm it still sits inside the allowed root before opening it.',
+      mentor: {
+        concept: 'Path traversal: the server glues your file name onto its folder path. In a path, ../ means "one folder up", so it can walk right out of the public folder.',
+        tools: ['curl', '../'],
+        steps: [
+          { seen: /^curl\b.*archive/, say: 'Open the document server homepage with curl.' },
+          { seen: /get\?file=/, say: 'Fetch one of the listed documents with /get?file=<name> to learn how the server finds files.' },
+          { seen: /\.\.\//, say: 'The server opens /srv/public/ + your name. What would ../ do to that path? Think about what sits just above public.' }
+        ],
+        watch: [
+          { out: /ravi:x:1001/, say: 'You climbed all the way to /etc. The traversal works; the secret is much closer to the public folder.' }
+        ]
+      },
       hints: ['curl http://archive.halcyon.local/ then fetch a listed doc: curl "http://archive.halcyon.local/get?file=welcome.txt"', 'The server opens /srv/public/ + whatever you pass. ../ walks up one directory.', 'There is a secrets file one level above public. Try file=../secret.txt'],
       files: {
         '/home/guest/README.txt': 'Document server: http://archive.halcyon.local/\nFetch docs with /get?file=<name>.\n'
@@ -358,6 +484,15 @@
       brief: 'The last machine. A final transmission, XOR-encrypted with a single secret byte.\nYou know one thing for sure: it contains a flag, and every flag starts with NR{',
       flag: F[9],
       lesson: 'Single-byte XOR has only 255 keys. With brute force or one known character the whole message falls.',
+      mentor: {
+        concept: 'Single-byte XOR combines every byte of a message with the same secret number. There are only 255 keys, and one known plaintext character is enough to compute the key.',
+        tools: ['head', 'help xor', 'xor -b', 'xor -k'],
+        steps: [
+          { seen: /transmission|^head\b/, say: 'Look at transmission.hex. Each pair of hex digits is one encrypted byte.' },
+          { seen: /^xor\b/, say: 'Read help xor. With only 255 possible keys, trying them all is realistic: xor -b' },
+          { seen: /^xor\s+-k/, say: 'Want to do it properly? You know the message contains NR{. Ciphertext byte XOR plaintext byte gives the key; then decrypt with xor -k <key>.' }
+        ]
+      },
       hints: ['transmission.hex is hex-encoded ciphertext. help xor', 'With only 255 possible keys you can just try them all: xor -b transmission.hex', 'Or be clever: ciphertext byte XOR known plaintext byte = key. Then xor -k <key> transmission.hex'],
       files: {
         '/home/guest/transmission.hex': hex,
