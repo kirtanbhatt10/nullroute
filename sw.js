@@ -1,5 +1,5 @@
 /* Offline support: cache the game so it works with no network. */
-var CACHE = 'nullroute-v1.0.0';
+var CACHE = 'nullroute-v1.1.0';
 var ASSETS = ['./', 'index.html', 'style.css', 'shell.js', 'levels.js', 'app.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', function (e) {
