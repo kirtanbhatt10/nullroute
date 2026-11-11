@@ -8,7 +8,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var STORAGE_KEY = 'nullroute.v1';
 
   // ---------------------------------------------------------------------------
@@ -216,17 +216,19 @@
     opts = opts || {};
     var LEVELS = opts.levels || [];
     var storage = opts.storage || null;
-    var state = { solved: {}, hints: {}, current: 0 };
+    var state = { solved: {}, hints: {}, current: 0, mentor: false };
     try {
       var saved = storage && JSON.parse(storage.getItem(STORAGE_KEY) || 'null');
       if (saved && typeof saved === 'object') {
         state.solved = saved.solved || {};
         state.hints = saved.hints || {};
         state.current = Math.min(Math.max(0, saved.current | 0), LEVELS.length - 1);
+        state.mentor = !!saved.mentor;
       }
     } catch (e) { /* corrupted or unavailable storage: start fresh */ }
 
     var level, fs, cwd, user, history = [];
+    var levelCmds = [], coachSeen = {}; // per-visit memory for mentor mode
 
     function save() {
       try { if (storage) storage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
@@ -240,6 +242,8 @@
       fs = buildFs(level.files);
       user = level.user;
       cwd = level.home;
+      levelCmds = [];
+      coachSeen = {};
       save();
     }
     connect(state.current);
@@ -334,6 +338,7 @@
       ssh: 'ssh <host>              connect to a target you have unlocked',
       levels: 'levels                  mission map and progress',
       hint: 'hint                    reveal the next hint for this target',
+      mentor: 'mentor [on|off|basics|<command>]   a guide that explains what to do next',
       submit: 'submit <NR{...}>        submit a captured flag',
       reset: 'reset --yes             wipe all progress'
     };
@@ -723,10 +728,221 @@
 
     C.reset = function (a) {
       if (a[0] !== '--yes') throw new Error('This wipes all progress. Run: reset --yes');
-      state = { solved: {}, hints: {}, current: 0 };
+      state = { solved: {}, hints: {}, current: 0, mentor: state.mentor };
       connect(0);
       return { text: 'Progress wiped.\n' + motd(), cls: 'dim' };
     };
+
+    // -------------------------------------------------------------------------
+    // Mentor mode. "mentor" explains where you are and what to try next, based
+    // on what you have already done on this target. "mentor on" turns on a coach
+    // that reacts to typos, errors and found-but-unsubmitted flags. It teaches
+    // methods; it never prints a flag.
+    // -------------------------------------------------------------------------
+
+    var TEACH = {
+      ls: ['ls lists the files in a folder. Names that start with a dot are hidden unless you add -a.', 'ls -la        everything here, with owners and sizes', 'ls /var/log   list another folder without moving'],
+      cd: ['cd moves you into another folder. cd .. goes up one level, plain cd goes home.', 'cd webapp', 'cd /var/log'],
+      pwd: ['pwd prints the folder you are in. The prompt shows it too (~ means your home).', 'pwd'],
+      cat: ['cat prints a file. Good for text, useless for binaries (try strings for those).', 'cat README.txt', 'cat .bash_history'],
+      head: ['head shows the first lines of a file; -n picks how many. tail does the same from the end.', 'head -n 5 /var/log/auth.log'],
+      tail: ['tail shows the last lines of a file; -n picks how many.', 'tail -n 20 /var/log/auth.log'],
+      grep: ['grep keeps only the lines that match a pattern. It turns a huge file into the few lines you care about.', 'grep error app.log', 'grep -i password notes.txt     (-i ignores case)', 'grep -r key .                  (-r searches every file below a folder)'],
+      find: ['find walks the whole filesystem looking for names that match.', 'find / -name "*.bak"', 'find /home -type d'],
+      wc: ['wc counts lines, words and bytes. wc -l tells you how big a file really is before you cat it.', 'wc -l /var/log/auth.log'],
+      file: ['file guesses what kind of data a file holds: text, base64, an executable...', 'file intercept.txt'],
+      echo: ['echo prints text. With -n there is no newline at the end, which matters when you encode it.', 'echo -n hello | base64'],
+      cut: ['cut splits each line on a delimiter and keeps one field.', 'cut -d: -f1 /etc/passwd     (field 1, split on :)', 'cut -d. -f2 session.txt     (the 2nd dot-separated part)'],
+      base64: ['base64 encodes bytes as letters, digits, + and /. -d decodes it. It is an encoding, not encryption.', 'base64 -d intercept.txt', 'echo -n secret | base64'],
+      base64url: ['base64url is base64 with - and _ instead of + and /, and no = padding. JWTs use it.', 'cut -d. -f1 session.txt | base64url -d', 'echo -n \'{"a":1}\' | base64url'],
+      rot13: ['rot13 shifts every letter 13 places. Running it twice gives back the original. Digits and symbols are untouched.', 'echo Uryyb | rot13'],
+      strings: ['strings pulls readable text out of a binary file and skips the noise.', 'strings door-ctl.bin', 'strings door-ctl.bin | grep key'],
+      xxd: ['xxd shows a file as hex bytes next to their printable characters.', 'xxd door-ctl.bin | head'],
+      xor: ['xor decrypts hex bytes that were XORed with a single-byte key. -b tries all 255 keys and ranks the most readable; -k uses a key you worked out.', 'xor -b transmission.hex', 'xor -k 5a transmission.hex'],
+      sha256sum: ['sha256sum prints a SHA-256 hash. The same input always gives the same hash, which is why wordlists can crack weak passwords.', 'echo -n password | sha256sum'],
+      crack: ['crack hashes every word in a wordlist and compares it against a target hash.', 'crack -w /usr/share/wordlists/common.txt <hash>'],
+      curl: ['curl talks to web servers. Wrap URLs in double quotes when they contain & or \' characters. -i shows response headers, -H adds a request header.', 'curl http://intranet.halcyon.local/', 'curl -i "http://shop.halcyon.local/login?user=a&pass=b"', 'curl -H "Authorization: Bearer <token>" http://api.halcyon.local/whoami'],
+      git: ['git keeps every version of every file. git log lists the commits; git show <hash> prints what one commit changed (the first 7 characters of the hash are enough).', 'git log --oneline', 'git show 3e1f0c9'],
+      su: ['su switches to another user if you know their password. exit goes back.', 'su admin <password>'],
+      ssh: ['ssh connects you to another target. Targets unlock one at a time as you capture flags.', 'ssh needle'],
+      submit: ['submit hands in a flag. Copy it exactly: NR{ ... } including the braces. Flags are case-sensitive.', 'submit NR{example}'],
+      hint: ['hint gives a stronger, more direct nudge for this target each time you run it. mentor teaches the method; hint points at the answer.', 'hint'],
+      levels: ['levels shows the mission map: rooted, open and locked targets.', 'levels'],
+      pipes: ['A pipe | sends one command\'s output into the next command. Chain as many as you like.', 'cat intercept.txt | base64 -d', 'strings door-ctl.bin | rot13 | grep key'],
+      quotes: ['Quotes keep text together as one argument. Single quotes keep everything literal; double quotes let you put \' inside.', 'echo -n \'{"alg":"none"}\' | base64url', 'curl "http://shop.halcyon.local/login?user=admin\'--&pass=x"'],
+      flags: ['A flag is a secret string shaped like NR{...}. Each target hides one. Find it, then: submit NR{...}', 'grep -r NR /home']
+    };
+    TEACH.pipe = TEACH['|'] = TEACH.pipes;
+    TEACH.quote = TEACH.quoting = TEACH.quotes;
+    TEACH.flag = TEACH.flags;
+    TEACH.man = TEACH.help = ['help lists every command; help <command> shows its options. mentor <command> explains when and why to use it.', 'help grep', 'mentor grep'];
+
+    var MENTOR_TAG = 'mentor › ';
+
+    function indent(list) { return list.map(function (t) { return '   ' + t; }); }
+
+    function mentorNext() {
+      var m = level.mentor || {}, steps = m.steps || [];
+      if (state.solved[level.id]) return 'This target is rooted. ' + nextStep();
+      if (!steps.length) return 'Explore with ls -a and cat, read every README, then try hint if you are stuck.';
+      var last = -1;
+      steps.forEach(function (st, i) { if (levelCmds.some(function (c) { return st.seen.test(c); })) last = i; });
+      if (last + 1 < steps.length) return steps[last + 1].say;
+      return 'You have already used every technique this target needs. Read your last output slowly: the flag looks like NR{...}. Still nothing? hint gives a direct nudge.';
+    }
+
+    function mentorGuide() {
+      var m = level.mentor || {}, out = [];
+      out.push('MENTOR · target ' + (state.current + 1) + '/' + LEVELS.length + ' · ' + level.host + ' — ' + level.title);
+      out.push('');
+      if (!state.solved[level.id]) {
+        out.push('Your goal');
+        out.push.apply(out, indent(['Find this machine\'s flag (it looks like NR{...}) and hand it in with: submit NR{...}']));
+        if (m.concept) { out.push(''); out.push('What this target teaches'); out.push.apply(out, indent([m.concept])); }
+        if (m.tools && m.tools.length) { out.push(''); out.push('Tools worth reaching for'); out.push.apply(out, indent([m.tools.join('   ')])); }
+        out.push('');
+        out.push('Your next move');
+      } else {
+        out.push('Status');
+      }
+      out.push.apply(out, indent([mentorNext()]));
+      out.push('');
+      out.push('mentor basics   how to play          mentor <command>   learn a command (try: mentor grep)');
+      out.push((state.mentor ? 'mentor off      stop live coaching' : 'mentor on       coach me as I type') + '   hint               a stronger, more direct nudge');
+      return out.join('\n') + '\n';
+    }
+
+    function mentorBasics() {
+      return [
+        'MENTOR · how to play nullroute',
+        '',
+        '1. You are in a Linux terminal on a target machine. Type a command and press Enter.',
+        '2. Every target hides one flag: a string shaped like NR{...}.',
+        '3. Explore:   ls -a (list everything)   cd <dir> (move)   cat <file> (read)',
+        '4. Search:    grep <pattern> <file>     find / -name "<glob>"',
+        '5. Chain:     a pipe | feeds one command into the next:  cat file | base64 -d',
+        '6. Capture:   submit NR{...}   unlocks the next target. Then:  ssh <host>',
+        '7. Map:       levels shows where you are and what is unlocked.',
+        '',
+        'Keys: Tab completes commands, files and hosts. ↑ ↓ walk your history. Ctrl+L clears.',
+        'Stuck? mentor tells you the next move without spoiling it. hint is more direct.',
+        'Each flag comes with a lesson: the real-world mistake behind it and how to fix it.'
+      ].join('\n') + '\n';
+    }
+
+    function mentorTeach(name) {
+      var t = TEACH[name];
+      if (!t) return null;
+      var out = ['MENTOR · ' + name, '', t[0]];
+      if (t.length > 1) { out.push(''); out.push('Examples'); out.push.apply(out, indent(t.slice(1))); }
+      if (HELP[name]) { out.push(''); out.push('Syntax'); out.push.apply(out, indent(HELP[name].split('\n'))); }
+      return out.join('\n') + '\n';
+    }
+
+    C.mentor = function (a) {
+      var sub = (a[0] || '').toLowerCase();
+      if (!sub) return { text: mentorGuide(), cls: 'mentor' };
+      if (sub === 'on') {
+        state.mentor = true; save();
+        return { text: 'Mentor mode ON. I will watch what you type and step in with tips: typos, errors,\nflags you have found but not submitted, and a nudge when you seem stuck.\nType mentor any time for your next move. mentor off to play solo.\n', cls: 'mentor' };
+      }
+      if (sub === 'off') {
+        state.mentor = false; save();
+        return { text: 'Mentor mode OFF. You are on your own. Type mentor whenever you want guidance.\n', cls: 'mentor' };
+      }
+      if (sub === 'status') return { text: 'Mentor mode is ' + (state.mentor ? 'ON' : 'OFF') + '.\n', cls: 'mentor' };
+      if (sub === 'next') return { text: MENTOR_TAG + mentorNext() + '\n', cls: 'mentor' };
+      if (sub === 'basics' || sub === 'howto' || sub === 'tutorial' || sub === 'start' || sub === 'intro') return { text: mentorBasics(), cls: 'mentor' };
+      var taught = mentorTeach(sub);
+      if (taught) return { text: taught, cls: 'mentor' };
+      if (HELP[sub]) return { text: 'MENTOR · ' + sub + '\n\n' + HELP[sub] + '\n', cls: 'mentor' };
+      throw new Error('mentor: nothing on "' + a[0] + '" yet. Try mentor basics, mentor next, or help for the command list.');
+    };
+
+    function editDistance(a, b) {
+      var d = [], i, j;
+      for (i = 0; i <= a.length; i++) { d[i] = [i]; }
+      for (j = 0; j <= b.length; j++) d[0][j] = j;
+      for (i = 1; i <= a.length; i++) {
+        for (j = 1; j <= b.length; j++) {
+          d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        }
+      }
+      return d[a.length][b.length];
+    }
+
+    function closestCommand(name) {
+      var best = null, bestD = 3;
+      Object.keys(C).forEach(function (c) {
+        var dist = editDistance(name.toLowerCase(), c);
+        if (dist < bestD) { bestD = dist; best = c; }
+      });
+      return best;
+    }
+
+    var ERROR_TIPS = [
+      { re: /Permission denied/, id: 'perm', say: 'Permission denied means the file belongs to another user. Either become that user (su) or find the same data somewhere you can read.' },
+      { re: /No such file or directory/, id: 'nofile', say: 'Check the name and where you are: pwd shows your folder, ls -a lists what is here, and Tab completes names so you cannot mistype them.' },
+      { re: /Is a directory/, id: 'isdir', say: 'That is a folder, not a file. ls <folder> lists it; cd <folder> moves into it.' },
+      { re: /matching ['"]/, id: 'quote', say: 'You opened a quote and never closed it. Quotes come in pairs: "like this" or \'like this\'.' },
+      { re: /unexpected token '\|'/, id: 'pipe', say: 'A pipe needs a command on both sides:  command | command' },
+      { re: /Incorrect flag/, id: 'badflag', say: 'Copy the flag exactly as printed, NR{ and } included. Letters, digits and underscores all matter.' },
+      { re: /Connection refused/, id: 'locked', say: 'Targets unlock in order. Run levels to see which ones are open.' },
+      { re: /not a git repository/, id: 'nogit', say: 'git commands only work inside a repository. Look for a project folder and cd into it first.' },
+      { re: /missing file operand/, id: 'operand', say: 'That command needs input: a file name after it, or text piped in with |' }
+    ];
+
+    function coach(line, lines, arrived, justSolved) {
+      var tips = [], m = level.mentor || {};
+      var first = (line.trim().split(/\s+/)[0] || '').toLowerCase();
+      if (first === 'mentor' || first === 'help' || first === 'man') return tips;
+      var text = lines.map(function (l) { return l.text; }).join('\n');
+      var errs = lines.filter(function (l) { return l.cls === 'err'; }).map(function (l) { return l.text; }).join('\n');
+      var once = function (id) { if (coachSeen[id]) return false; coachSeen[id] = true; return true; };
+
+      if (arrived) {
+        if (state.solved[level.id]) tips.push('You have already rooted ' + level.host + '. ' + nextStep());
+        else {
+          if (m.concept) tips.push('Briefing: ' + m.concept);
+          if (m.tools && m.tools.length) tips.push('Tools for this one: ' + m.tools.join(', '));
+          tips.push('First move: ' + mentorNext());
+        }
+        return format(tips);
+      }
+      if (justSolved) {
+        tips.push('Well done. Read the lesson above: it is the real-world mistake you just exploited. Then ssh to the next target and I will brief you.');
+        return format(tips);
+      }
+
+      var missing = /^(\S+): command not found/.exec(errs);
+      if (missing) {
+        var guess = closestCommand(missing[1]);
+        tips.push(guess ? 'Did you mean ' + guess + '? ' + (TEACH[guess] ? TEACH[guess][0] : '') : 'That is not a command here. help lists them all; mentor basics shows how to play.');
+      }
+      ERROR_TIPS.forEach(function (t) { if (t.re.test(errs) && once('err:' + t.id)) tips.push(t.say); });
+
+      if (!state.solved[level.id] && level.flag && first !== 'submit' && text.indexOf(level.flag) !== -1 && once('flag')) {
+        tips.push('That NR{...} in the output is this target\'s flag. Capture it: submit followed by the flag, copied exactly.');
+      }
+
+      (m.watch || []).forEach(function (w, i) {
+        var hit = (!w.cmd || w.cmd.test(line)) && (!w.out || w.out.test(text));
+        if (hit && once('watch:' + i)) tips.push(w.say);
+      });
+
+      if (!tips.length && !state.solved[level.id] && levelCmds.length >= 12 && once('stuck')) {
+        tips.push('You have run ' + levelCmds.length + ' commands here. Here is a nudge: ' + mentorNext());
+      }
+      return format(tips);
+    }
+
+    function format(tips) {
+      var out = [];
+      tips.forEach(function (t) {
+        t.split('\n').forEach(function (l, i) { out.push({ text: (i ? '         ' : MENTOR_TAG) + l, cls: 'mentor' }); });
+      });
+      return out;
+    }
 
     C.banner = function () { return { text: BANNER + '\n', cls: 'acc' }; };
 
@@ -736,6 +952,20 @@
 
     function exec(line) {
       line = String(line == null ? '' : line);
+      var before = level, solvedBefore = !!state.solved[level.id];
+      var res = runLine(line);
+      if (!line.trim() || res.clear) return res;
+      var arrived = level !== before;
+      if (!arrived) { levelCmds.push(line.trim()); if (levelCmds.length > 200) levelCmds.shift(); }
+      if (state.mentor) {
+        var justSolved = !arrived && !solvedBefore && !!state.solved[level.id];
+        var tips = coach(line, res.lines, arrived, justSolved);
+        if (tips.length) res.lines = res.lines.concat(tips);
+      }
+      return res;
+    }
+
+    function runLine(line) {
       if (!line.trim()) return { lines: [] };
       history.push(line);
       if (history.length > 500) history.shift();
@@ -771,6 +1001,9 @@
       var tokens = line.split(/\s+/), last = tokens[tokens.length - 1], opts;
       if (tokens.length === 1) {
         opts = Object.keys(C).filter(function (c) { return c.indexOf(last) === 0; });
+      } else if (tokens[0] === 'mentor' && tokens.length === 2) {
+        opts = ['on', 'off', 'status', 'next', 'basics', 'pipes', 'quotes', 'flags'].concat(Object.keys(TEACH).filter(function (k) { return /^[a-z0-9]+$/.test(k) && HELP[k]; }))
+          .filter(function (o, i, all) { return o.indexOf(last) === 0 && all.indexOf(o) === i; });
       } else if (tokens[0] === 'ssh') {
         opts = LEVELS.filter(function (l, i) { return unlocked(i) && l.host.indexOf(last) === 0; }).map(function (l) { return l.host; });
       } else {
@@ -794,6 +1027,7 @@
         { text: 'nullroute v' + VERSION + ' · a hacking game that runs entirely in your browser', cls: 'dim' },
         { text: 'You are a contractor hired to red-team Halcyon Dynamics. Twelve machines. Twelve flags.', cls: null },
         { text: 'Type help to see commands, hint if you are stuck, levels for the mission map.', cls: null },
+        { text: 'New to this? Type mentor for a guide, or mentor on to be coached as you play.', cls: 'mentor' },
         { text: done ? 'Progress restored: ' + done + '/' + LEVELS.length + ' targets rooted.' : 'Start by looking around: ls', cls: 'dim' }]
         .concat(motd().split('\n').filter(function (x, i, a) { return i < a.length - 1; }).map(function (t) { return { text: t, cls: 'motd' }; }));
     }
