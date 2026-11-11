@@ -215,3 +215,70 @@ test('welcome screen renders', () => {
   assert.ok(lines.length > 5);
   assert.ok(lines.some((l) => /Twelve machines/.test(l.text)));
 });
+
+const mentorLines = (g, line) => g.exec(line).lines.filter((l) => l.cls === 'mentor').map((l) => l.text).join('\n');
+
+test('mentor: on-demand guide explains the goal and adapts the next move', () => {
+  const g = newGame();
+  const guide = run(g, 'mentor');
+  assert.match(guide, /target 1\/12/);
+  assert.match(guide, /Your next move[\s\S]*ls lists the files/);
+  run(g, 'ls');
+  assert.match(run(g, 'mentor next'), /help ls/);
+  run(g, 'ls -a');
+  assert.match(run(g, 'mentor next'), /cat <name>/);
+});
+
+test('mentor: never prints a flag, on any target', () => {
+  const levels = buildLevels(Shell.util);
+  const st = memStorage();
+  st.setItem('nullroute.v1', JSON.stringify({ solved: Object.fromEntries(levels.map((l) => [l.id, true])), current: 0 }));
+  const g = newGame(st);
+  levels.forEach((l, i) => {
+    run(g, 'ssh ' + l.host);
+    const text = [run(g, 'mentor'), run(g, 'mentor next'), run(g, 'mentor basics')].join('\n');
+    assert.ok(!text.includes(l.flag), 'mentor leaked the flag on ' + l.host);
+    assert.ok(l.mentor && l.mentor.concept && l.mentor.steps.length, 'target ' + (i + 1) + ' has mentor guidance');
+  });
+});
+
+test('mentor: teaches commands and rejects unknown topics', () => {
+  const g = newGame();
+  assert.match(run(g, 'mentor grep'), /Examples[\s\S]*grep -r/);
+  assert.match(run(g, 'mentor pipes'), /\|/);
+  assert.match(run(g, 'mentor xyzzy'), /nothing on "xyzzy"/);
+  assert.match(run(g, 'help mentor'), /mentor \[on\|off/);
+  assert.equal(g.complete('mentor base6').line, 'mentor base64');
+  assert.equal(g.complete('mentor basi').line, 'mentor basics ');
+});
+
+test('mentor: coach mode is opt-in, persists, and reacts to play', () => {
+  const st = memStorage();
+  const g = newGame(st);
+  assert.equal(mentorLines(g, 'lss'), '', 'coach is silent until turned on');
+  run(g, 'mentor on');
+  assert.match(mentorLines(g, 'lss'), /Did you mean ls\?/);
+  assert.match(mentorLines(g, 'cat nope.txt'), /Tab completes/);
+  const flagTip = mentorLines(g, 'cat .flag');
+  assert.match(flagTip, /submit/);
+  assert.doesNotMatch(flagTip, /NR\{h1dd3n/, 'the tip must not repeat the flag');
+  assert.match(mentorLines(g, 'submit NR{wrong}'), /Copy the flag exactly/);
+  assert.match(mentorLines(g, 'submit ' + flagIn(run(g, 'cat .flag'))), /Well done/);
+  assert.match(mentorLines(g, 'ssh needle'), /Briefing:[\s\S]*First move/);
+  assert.match(mentorLines(g, 'grep flag /var/log/auth.log'), /decoy/);
+
+  const g2 = newGame(st);
+  assert.match(run(g2, 'mentor status'), /ON/, 'mentor setting survives a reload');
+  run(g2, 'reset --yes');
+  assert.match(run(g2, 'mentor status'), /ON/, 'reset wipes progress but keeps the preference');
+  run(g2, 'mentor off');
+  assert.equal(mentorLines(g2, 'lss'), '');
+});
+
+test('mentor: nudges a player who seems stuck', () => {
+  const g = newGame();
+  run(g, 'mentor on');
+  let tip = '';
+  for (let i = 0; i < 12 && !tip; i++) tip = mentorLines(g, 'pwd');
+  assert.match(tip, /commands here\. Here is a nudge/);
+});
